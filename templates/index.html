@@ -15,12 +15,27 @@
       </select>
       <button type="submit">Submit</button>
     </form>
+
     {% if result %}
       <h4>Result:</h4>
-      <textarea readonly>{{ result }}</textarea>
+      <div class="result-box">
+        <textarea id="resultText" readonly>{{ result }}</textarea>
+        <button class="copy-btn" onclick="copyText()">📋 Copy</button>
+      </div>
     {% endif %}
+
     <hr>
     <a href="/file">Go to File Encrypt/Decrypt 🔁</a>
   </div>
+
+  <script>
+    function copyText() {
+      const resultText = document.getElementById("resultText");
+      resultText.select();
+      resultText.setSelectionRange(0, 99999); // For mobile
+      document.execCommand("copy");
+      alert("✅ Text copied to clipboard!");
+    }
+  </script>
 </body>
 </html>
