@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>File Encryptor / Decryptor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <h2>📁 File Encryptor / Decryptor</h2>
+    <form method="POST" enctype="multipart/form-data">
+      <input type="file" name="file" required>
+      <select name="mode">
+        <option value="Encrypt" {% if operation == 'Encrypt' %}selected{% endif %}>Encrypt</option>
+        <option value="Decrypt" {% if operation == 'Decrypt' %}selected{% endif %}>Decrypt</option>
+      </select>
+      <button type="submit">Submit</button>
+    </form>
+    {% if result_file and 'Error' not in result_file %}
+      <h4>Result File:</h4>
+      <a href="{{ url_for('download_file', filename=result_file.split('/')[-1]) }}">Download Result 📥</a>
+    {% elif result_file %}
+      <p style="color:red;">{{ result_file }}</p>
+    {% endif %}
+    <hr>
+    <a href="/">Back to Text Encrypt/Decrypt 🔙</a>
+  </div>
+</body>
+</html>
