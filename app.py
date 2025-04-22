@@ -28,15 +28,32 @@ def decrypt_text(cipher_text):
     decrypted = cipher.decrypt(decoded)
     return unpad(decrypted, AES.block_size).decode()
 
-def encrypt_file(data):
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    padded = pad(data, AES.block_size)
-    return cipher.encrypt(padded)
+# --- File Encryption ---
+def encrypt_file(file_data, filename):
+    ext = os.path.splitext(filename)[1]
+    prefix = f"{ext}::EXT::".encode()
+    data_with_ext = prefix + file_data
 
-def decrypt_file(data):
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    decrypted = cipher.decrypt(data)
-    return unpad(decrypted, AES.block_size)
+    padded = pad(data_with_ext, AES.block_size)
+    encrypted = cipher.encrypt(padded)
+    return encrypted
+
+# --- File Decryption ---
+def decrypt_file(encrypted_data):
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    decrypted = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+
+    try:
+        ext_marker = b'::EXT::'
+        ext_index = decrypted.find(ext_marker)
+        if ext_index == -1:
+            raise ValueError("Extension marker not found.")
+        ext = decrypted[:ext_index].decode()
+        content = decrypted[ext_index + len(ext_marker):]
+        return ext, content
+    except Exception as e:
+        raise ValueError("Invalid decryption format") from e
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -60,36 +77,39 @@ def index():
 
     return render_template('index.html', result=result, input_text=input_text, mode=mode, download_url=download_url)
 
-@app.route('/file', methods=['POST'])
+@app.route('/file', methods=['GET', 'POST'])
 def handle_file():
-    file = request.files['file']
-    mode = request.form['mode']
-    filename = secure_filename(file.filename)
-    upload_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(upload_path)
+    result_file = None
+    operation = None
 
-    with open(upload_path, 'rb') as f:
-        file_data = f.read()
+    if request.method == 'POST':
+        file = request.files['file']
+        operation = request.form['mode']
+        filename = secure_filename(file.filename)
 
-    try:
-        if mode == 'Encrypt':
-            processed_data = encrypt_file(file_data)
-            output_filename = f'encrypted_{filename}.enc'
-        else:
-            processed_data = decrypt_file(file_data)
-            output_filename = f'decrypted_{filename}'
+        if file and operation == 'Encrypt':
+            file_data = file.read()
+            encrypted_data = encrypt_file(file_data, filename)
+            output_path = os.path.join(app.config['PROCESSED_FOLDER'], filename + '.enc')
+            with open(output_path, 'wb') as f:
+                f.write(encrypted_data)
+            result_file = output_path
 
-        output_path = os.path.join(app.config['DOWNLOAD_FOLDER'], output_filename)
-        with open(output_path, 'wb') as f:
-            f.write(processed_data)
+        elif file and operation == 'Decrypt':
+            file_data = file.read()
+            try:
+                ext, decrypted_data = decrypt_file(file_data)
+                output_name = filename.replace('.enc', '') + ext
+                output_path = os.path.join(app.config['PROCESSED_FOLDER'], output_name)
+                with open(output_path, 'wb') as f:
+                    f.write(decrypted_data)
+                result_file = output_path
+            except Exception as e:
+                result_file = f"❌ Error: {str(e)}"
 
-        return render_template('index.html', result=None, input_text=None, mode=mode, download_url=f'/download/{output_filename}')
-    except Exception as e:
-        return render_template('index.html', result=f"❌ Error: {str(e)}", input_text=None, mode=mode)
+    return render_template('file.html', result_file=result_file, operation=operation)
 
 @app.route('/download/<filename>')
 def download_file(filename):
-    return send_from_directory(app.config['DOWNLOAD_FOLDER'], filename, as_attachment=True)
-
-if __name__ == '__main__':
-    app.run(debug=True)
+    file_path = os.path.join(app.config['PROCESSED_FOLDER'], filename)
+    return send_file(file_path, as_attachment=True)
