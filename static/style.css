@@ -44,3 +44,22 @@ button {
 button:hover {
   background-color: #45a049;
 }
+.result-box {
+  position: relative;
+}
+
+.copy-btn {
+  background-color: #008CBA;
+  color: white;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 5px;
+  float: right;
+}
+
+.copy-btn:hover {
+  background-color: #0072a1;
+}
