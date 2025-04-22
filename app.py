@@ -1,32 +1,33 @@
-from flask import Flask, render_template, request, send_from_directory
+import os
+from flask import Flask, render_template, request, send_file
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
 import base64
-import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'static/uploads'
-DOWNLOAD_FOLDER = 'static/downloads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['DOWNLOAD_FOLDER'] = DOWNLOAD_FOLDER
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['PROCESSED_FOLDER'] = 'processed'
 
-key = b'ThisIsASecretKey'
-iv = b'ThisIsAnInitVect'
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['PROCESSED_FOLDER'], exist_ok=True)
 
-def encrypt_text(text):
+key = b'ThisIsASecretKey1234567890123456'  # 32 bytes for AES-256
+iv = b'ThisIsAnInitVect'  # 16 bytes
+
+# --- Text Encryption ---
+def encrypt_text(plain_text):
     cipher = AES.new(key, AES.MODE_CBC, iv)
-    padded_data = pad(text.encode(), AES.block_size)
-    encrypted = cipher.encrypt(padded_data)
+    padded = pad(plain_text.encode(), AES.block_size)
+    encrypted = cipher.encrypt(padded)
     return base64.b64encode(encrypted).decode()
 
+# --- Text Decryption ---
 def decrypt_text(cipher_text):
     cipher = AES.new(key, AES.MODE_CBC, iv)
     decoded = base64.b64decode(cipher_text)
-    decrypted = cipher.decrypt(decoded)
-    return unpad(decrypted, AES.block_size).decode()
+    decrypted = unpad(cipher.decrypt(decoded), AES.block_size)
+    return decrypted.decode()
 
 # --- File Encryption ---
 def encrypt_file(file_data, filename):
@@ -56,26 +57,23 @@ def decrypt_file(encrypted_data):
         raise ValueError("Invalid decryption format") from e
 
 @app.route('/', methods=['GET', 'POST'])
-def index():
+def text_encrypt_decrypt():
     result = ""
     input_text = ""
     mode = "Encrypt"
-    download_url = None
 
     if request.method == 'POST':
-        if 'text' in request.form:
-            input_text = request.form['text']
-            mode = request.form['mode']
+        input_text = request.form['text']
+        mode = request.form['mode']
+        try:
+            if mode == 'Encrypt':
+                result = encrypt_text(input_text)
+            else:
+                result = decrypt_text(input_text)
+        except Exception as e:
+            result = f"❌ Error: {str(e)}"
 
-            try:
-                if mode == 'Encrypt':
-                    result = encrypt_text(input_text)
-                else:
-                    result = decrypt_text(input_text)
-            except Exception as e:
-                result = f"❌ Error: {str(e)}"
-
-    return render_template('index.html', result=result, input_text=input_text, mode=mode, download_url=download_url)
+    return render_template('index.html', result=result, input_text=input_text, mode=mode)
 
 @app.route('/file', methods=['GET', 'POST'])
 def handle_file():
@@ -113,3 +111,6 @@ def handle_file():
 def download_file(filename):
     file_path = os.path.join(app.config['PROCESSED_FOLDER'], filename)
     return send_file(file_path, as_attachment=True)
+
+if __name__ == '__main__':
+    app.run(debug=True)
